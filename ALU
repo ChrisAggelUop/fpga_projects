@@ -1,0 +1,114 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;
+use work.alulib.all;            
+
+
+entity alu is
+    generic (n : integer := 8);
+    port (
+        ac    : in std_logic_vector(n-1 downto 0); 
+        db    : in std_logic_vector(n-1 downto 0); 
+        alus  : in std_logic_vector(7 downto 1);   
+        dout  : out std_logic_vector(n-1 downto 0) 
+    );
+end entity alu;
+
+
+
+architecture arch of alu is
+
+
+    signal zero_8bit      : std_logic_vector(n-1 downto 0) := (others => '0');
+    
+    signal alus_S_A       : std_logic;
+    signal alus_S_B       : std_logic_vector(1 downto 0);
+    signal alus_S_L       : std_logic_vector(1 downto 0);
+    signal alus_S_OUT     : std_logic;
+    signal alus_C_IN      : std_logic;
+  
+    signal db_inverted    : std_logic_vector(n-1 downto 0); 
+    signal mux1_out       : std_logic_vector(n-1 downto 0);
+
+    signal mux2_out       : std_logic_vector(n-1 downto 0); 
+    
+    signal au_add_out     : std_logic_vector(n-1 downto 0);
+    signal au_cout        : std_logic;                      
+    signal au_out         : std_logic_vector(n-1 downto 0); 
+    
+    signal lu_and         : std_logic_vector(n-1 downto 0); 
+    signal lu_or          : std_logic_vector(n-1 downto 0); 
+    signal lu_xor         : std_logic_vector(n-1 downto 0); 
+    signal lu_not         : std_logic_vector(n-1 downto 0); 
+    signal lu_out         : std_logic_vector(n-1 downto 0); 
+
+begin
+
+    alus_S_A   <= alus(7);
+    alus_S_B   <= alus(6 downto 5);
+    alus_S_L   <= alus(4 downto 3);
+    alus_S_OUT <= alus(2);
+    alus_C_IN  <= alus(1);
+    
+    db_inverted <= not db;    --Xreiazotan na oristei etsi allios den douleye
+    lu_and <= ac and db;
+    lu_or  <= ac or db;
+    lu_xor <= ac xor db;
+    lu_not <= not ac;
+    
+
+    MUX_LOGIC: mux4 
+        generic map (n => n)
+        port map (
+            d0  => lu_and,
+            d1  => lu_or,
+            d2  => lu_xor,
+            d3  => lu_not,
+            sel => alus_S_L, 
+            q   => lu_out
+        );
+        
+
+    MUX_AC_ZERO: mux2
+        generic map (n => n)
+        port map (
+            d0  => ac,
+            d1  => zero_8bit,
+            sel => alus_S_A,
+            q   => mux1_out
+        );
+
+    MUX_BUS: mux4
+        generic map (n => n)
+        port map (
+            d0  => db,         
+            d1  => db_inverted,   --Xreiazotan na oristei etsi allios den douleye
+            d2  => zero_8bit,  
+            d3  => zero_8bit,  
+            sel => alus_S_B, 
+            q   => mux2_out
+        );
+    
+
+    ADDER_8BIT: adder8bit
+        port map (
+            a    => mux1_out, 
+            b    => mux2_out, 
+            cin  => alus_C_IN,
+            s    => au_add_out,
+            cout => au_cout    
+        );
+        
+    au_out <= au_add_out; 
+
+
+    MUX_FINAL: mux2
+        generic map (n => n)
+        port map (
+            d0  => au_out,  
+            d1  => lu_out,  
+            sel => alus_S_OUT, 
+            q   => dout
+        );
+
+end architecture arch;
